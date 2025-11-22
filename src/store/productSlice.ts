@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Product, ProductState } from '../types/product';
-import { fetchProducts } from '../services/api';
+import { fetchProducts, createProduct, CreateProductData } from '../services/api';
 
 const initialState: ProductState = {
   products: [],
@@ -33,6 +33,20 @@ export const getProducts = createAsyncThunk(
   }
 );
 
+export const addProduct = createAsyncThunk(
+  'products/createProduct',
+  async (productData: CreateProductData, { rejectWithValue }) => {
+    try {
+      const product = await createProduct(productData);
+      return product;
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'Failed to create product'
+      );
+    }
+  }
+);
+
 const productSlice = createSlice({
   name: 'products',
   initialState,
@@ -46,7 +60,7 @@ const productSlice = createSlice({
       state.filters.maxPrice = action.payload.max;
       state.pagination.currentPage = 1;
     },
-    setSortBy: (state, action: PayloadAction<'name' | 'price-low' | 'price-high' | 'rating'>) => {
+    setSortBy: (state, action: PayloadAction<'name' | 'price-low' | 'price-high'>) => {
       state.filters.sortBy = action.payload;
       state.pagination.currentPage = 1;
     },
@@ -80,6 +94,19 @@ const productSlice = createSlice({
         state.error = null;
       })
       .addCase(getProducts.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(addProduct.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addProduct.fulfilled, (state, action: PayloadAction<Product>) => {
+        state.loading = false;
+        state.products.push(action.payload);
+        state.error = null;
+      })
+      .addCase(addProduct.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

@@ -4,11 +4,7 @@ export interface Product {
   price: number;
   description: string;
   category: string;
-  image: string;
-  rating: {
-    rate: number;
-    count: number;
-  };
+  // image: string;
 }
 
 export interface ProductState {
@@ -20,7 +16,7 @@ export interface ProductState {
     category: string;
     minPrice: number | null;
     maxPrice: number | null;
-    sortBy: 'name' | 'price-low' | 'price-high' | 'rating';
+    sortBy: 'name' | 'price-low' | 'price-high';
   };
   pagination: {
     currentPage: number;
