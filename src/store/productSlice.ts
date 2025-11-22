@@ -79,6 +79,10 @@ const productSlice = createSlice({
   name: 'products',
   initialState,
   reducers: {
+    clearProducts: (state) => {
+      state.products = [];
+      state.error = null;
+    },
     setCategory: (state, action: PayloadAction<string>) => {
       state.filters.category = action.payload;
       state.pagination.currentPage = 1;
@@ -170,7 +174,7 @@ const productSlice = createSlice({
   },
 });
 
-export const { setSearchTerm, setCategory, setPriceRange, setSortBy, clearFilters, setCurrentPage } = productSlice.actions;
+export const { setSearchTerm, setCategory, setPriceRange, setSortBy, clearFilters, setCurrentPage, clearProducts } = productSlice.actions;
 
 export default productSlice.reducer;
 

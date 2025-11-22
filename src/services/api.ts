@@ -24,8 +24,14 @@ export interface CreateProductData {
 
 export const fetchProducts = async (): Promise<Product[]> => {
   try {
-    const response = await fetch(BACKEND_API_URL);
+    const headers = getAuthHeaders();
+    const response = await fetch(BACKEND_API_URL, {
+      headers,
+    });
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Authentication required. Please login to view products.');
+      }
       throw new Error('Failed to fetch products');
     }
     const result = await response.json();

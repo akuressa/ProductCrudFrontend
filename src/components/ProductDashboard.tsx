@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
-import { getProducts, setSearchTerm, setCategory, setPriceRange, setSortBy, clearFilters, setCurrentPage, editProduct, removeProduct } from '../store/productSlice';
+import { getProducts, setSearchTerm, setCategory, setPriceRange, setSortBy, clearFilters, setCurrentPage, editProduct, removeProduct, clearProducts } from '../store/productSlice';
 import {
   selectFilteredAndSortedProducts,
   selectPaginatedProducts,
@@ -42,8 +42,13 @@ const ProductDashboard: React.FC = () => {
   const [showRegister, setShowRegister] = useState<boolean>(false);
 
   useEffect(() => {
-    dispatch(getProducts());
-  }, [dispatch]);
+    if (isAuthenticated) {
+      dispatch(getProducts());
+    } else {
+      // Clear products when user logs out
+      dispatch(clearProducts());
+    }
+  }, [dispatch, isAuthenticated]);
 
   // Initialize local state from Redux filters
   useEffect(() => {
@@ -85,33 +90,7 @@ const ProductDashboard: React.FC = () => {
     setShowSort(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Loading products...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-xl font-semibold text-red-800 mb-2">Error</h2>
-          <p className="text-red-600">{error}</p>
-          <button
-            onClick={() => dispatch(getProducts())}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Don't block the UI on error - show the dashboard with error message
 
   const hasActiveFilters =
     filters.searchTerm ||
@@ -420,8 +399,45 @@ const ProductDashboard: React.FC = () => {
           )}
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <p className="text-yellow-800 font-medium">{error}</p>
+                  {!isAuthenticated && (
+                    <p className="text-yellow-700 text-sm mt-1">Please login or register to view products.</p>
+                  )}
+                </div>
+              </div>
+              {isAuthenticated && (
+                <button
+                  onClick={() => dispatch(getProducts())}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                >
+                  Try Again
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Loading Indicator */}
+        {loading && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              <p className="text-blue-800">Loading products...</p>
+            </div>
+          </div>
+        )}
+
         {/* Products Grid */}
-        {allProducts.length === 0 ? (
+        {!loading && allProducts.length === 0 && !error && (
           <div className="text-center py-12 bg-white rounded-lg shadow-md">
             <p className="text-gray-600 text-lg">No products found matching your filters.</p>
             {hasActiveFilters && (
@@ -433,7 +449,9 @@ const ProductDashboard: React.FC = () => {
               </button>
             )}
           </div>
-        ) : (
+        )}
+
+        {!loading && allProducts.length > 0 && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (

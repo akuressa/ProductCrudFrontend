@@ -11,6 +11,8 @@ interface ProductFormProps {
   product?: Product | null;
 }
 
+const PREDEFINED_CATEGORIES = ['robotics', 'jewellary', 'watches', 'clothes'];
+
 const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories, product }) => {
   const dispatch = useDispatch<AppDispatch>();
   const isEditMode = !!product;
@@ -183,7 +185,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories, 
               disabled={isSubmitting}
             >
               <option value="">Select a category</option>
-              {existingCategories.map((category) => (
+              {PREDEFINED_CATEGORIES.map((category) => (
                 <option key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </option>
