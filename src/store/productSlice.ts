@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Product, ProductState } from '../types/product';
-import { fetchProducts, createProduct, CreateProductData } from '../services/api';
+import { fetchProducts, createProduct, updateProduct, deleteProduct, CreateProductData } from '../services/api';
 
 const initialState: ProductState = {
   products: [],
@@ -42,6 +42,34 @@ export const addProduct = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error instanceof Error ? error.message : 'Failed to create product'
+      );
+    }
+  }
+);
+
+export const editProduct = createAsyncThunk(
+  'products/updateProduct',
+  async ({ id, productData }: { id: number; productData: CreateProductData }, { rejectWithValue }) => {
+    try {
+      const product = await updateProduct(id, productData);
+      return product;
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'Failed to update product'
+      );
+    }
+  }
+);
+
+export const removeProduct = createAsyncThunk(
+  'products/deleteProduct',
+  async (id: number, { rejectWithValue }) => {
+    try {
+      await deleteProduct(id);
+      return id;
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'Failed to delete product'
       );
     }
   }
@@ -107,6 +135,35 @@ const productSlice = createSlice({
         state.error = null;
       })
       .addCase(addProduct.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(editProduct.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(editProduct.fulfilled, (state, action: PayloadAction<Product>) => {
+        state.loading = false;
+        const index = state.products.findIndex((p) => p.id === action.payload.id);
+        if (index !== -1) {
+          state.products[index] = action.payload;
+        }
+        state.error = null;
+      })
+      .addCase(editProduct.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(removeProduct.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(removeProduct.fulfilled, (state, action: PayloadAction<number>) => {
+        state.loading = false;
+        state.products = state.products.filter((p) => p.id !== action.payload);
+        state.error = null;
+      })
+      .addCase(removeProduct.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

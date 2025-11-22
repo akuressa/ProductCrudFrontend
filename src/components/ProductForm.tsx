@@ -1,22 +1,36 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
-import { addProduct, getProducts } from '../store/productSlice';
+import { addProduct, editProduct, getProducts } from '../store/productSlice';
 import { CreateProductData } from '../services/api';
+import { Product } from '../types/product';
 
 interface ProductFormProps {
   onClose: () => void;
   existingCategories: string[];
+  product?: Product | null;
 }
 
-const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories }) => {
+const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories, product }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const [formData, setFormData] = useState<CreateProductData>({
-    title: '',
-    price: 0,
-    description: '',
-    category: '',
+  const isEditMode = !!product;
+  const [formData, setFormData] = useState<Omit<CreateProductData, 'price'> & { price: string | number }>({
+    title: product?.title || '',
+    price: product?.price || '',
+    description: product?.description || '',
+    category: product?.category || '',
   });
+
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        title: product.title,
+        price: product.price,
+        description: product.description || '',
+        category: product.category,
+      });
+    }
+  }, [product]);
   const [errors, setErrors] = useState<Partial<Record<keyof CreateProductData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,7 +41,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories }
       newErrors.title = 'Title is required';
     }
 
-    if (formData.price <= 0) {
+    const priceValue = typeof formData.price === 'string' ? parseFloat(formData.price) : formData.price;
+    if (!priceValue || priceValue <= 0 || isNaN(priceValue)) {
       newErrors.price = 'Price must be greater than 0';
     }
 
@@ -48,17 +63,24 @@ const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories }
 
     setIsSubmitting(true);
     try {
-      await dispatch(addProduct({
+      const priceValue = typeof formData.price === 'string' ? parseFloat(formData.price) : formData.price;
+      const productData = {
         title: formData.title.trim(),
-        price: formData.price,
+        price: priceValue,
         description: formData.description?.trim() || null,
         category: formData.category.trim(),
-      })).unwrap();
+      };
+
+      if (isEditMode && product) {
+        await dispatch(editProduct({ id: product.id, productData })).unwrap();
+      } else {
+        await dispatch(addProduct(productData)).unwrap();
+      }
       // Refresh the product list to ensure we have the latest data
       await dispatch(getProducts());
       onClose();
     } catch (error) {
-      setErrors({ category: error instanceof Error ? error.message : 'Failed to create product' });
+      setErrors({ category: error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} product` });
     } finally {
       setIsSubmitting(false);
     }
@@ -75,7 +97,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories }
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">Add New Product</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{isEditMode ? 'Edit Product' : 'Add New Product'}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -132,8 +154,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories }
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.price}
-                onChange={(e) => handleChange('price', parseFloat(e.target.value) || 0)}
+                value={formData.price === '' ? '' : formData.price}
+                onChange={(e) => handleChange('price', e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                 className={`w-full pl-8 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   errors.price ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -151,25 +173,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories }
             <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
               Category <span className="text-red-500">*</span>
             </label>
-            <input
+            <select
               id="category"
-              type="text"
-              list="category-list"
               value={formData.category}
               onChange={(e) => handleChange('category', e.target.value)}
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 errors.category ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Enter or select a category"
               disabled={isSubmitting}
-            />
-            <datalist id="category-list">
+            >
+              <option value="">Select a category</option>
               {existingCategories.map((category) => (
                 <option key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </option>
               ))}
-            </datalist>
+            </select>
             {errors.category && (
               <p className="mt-1 text-sm text-red-600">{errors.category}</p>
             )}
@@ -231,10 +250,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ onClose, existingCategories }
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Creating...
+                  {isEditMode ? 'Updating...' : 'Creating...'}
                 </span>
               ) : (
-                'Create Product'
+                isEditMode ? 'Update Product' : 'Create Product'
               )}
             </button>
           </div>

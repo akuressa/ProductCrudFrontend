@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
-import { getProducts, setSearchTerm, setCategory, setPriceRange, setSortBy, clearFilters, setCurrentPage } from '../store/productSlice';
+import { getProducts, setSearchTerm, setCategory, setPriceRange, setSortBy, clearFilters, setCurrentPage, editProduct, removeProduct } from '../store/productSlice';
 import {
   selectFilteredAndSortedProducts,
   selectPaginatedProducts,
@@ -11,6 +11,10 @@ import {
 } from '../store/productSelectors';
 import ProductCard from './ProductCard';
 import ProductForm from './ProductForm';
+import LoginForm from './LoginForm';
+import RegisterForm from './RegisterForm';
+import { Product } from '../types/product';
+import { logoutUser } from '../store/authSlice';
 
 const ProductDashboard: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -20,6 +24,7 @@ const ProductDashboard: React.FC = () => {
   const categories = useSelector(selectUniqueCategories);
   const priceRange = useSelector(selectPriceRange);
   const { loading, error, filters, pagination } = useSelector((state: RootState) => state.products);
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
   // Local state for filter values (not applied until Apply button is clicked)
   const [localCategory, setLocalCategory] = useState<string>('');
@@ -31,6 +36,10 @@ const ProductDashboard: React.FC = () => {
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [showSort, setShowSort] = useState<boolean>(false);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [showLogin, setShowLogin] = useState<boolean>(false);
+  const [showRegister, setShowRegister] = useState<boolean>(false);
 
   useEffect(() => {
     dispatch(getProducts());
@@ -150,14 +159,54 @@ const ProductDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
-            Product Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Showing {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
-            {totalPages > 1 && ` (Page ${pagination.currentPage} of ${totalPages})`}
-          </p>
+        {/* Header with Auth Buttons */}
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+              Product Dashboard
+            </h1>
+            <p className="text-gray-600">
+              Showing {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
+              {totalPages > 1 && ` (Page ${pagination.currentPage} of ${totalPages})`}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-700">{user?.name || user?.email}</p>
+                  <p className="text-xs text-gray-500">Logged in</p>
+                </div>
+                <button
+                  onClick={() => dispatch(logoutUser())}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setShowLogin(true);
+                    setShowRegister(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => {
+                    setShowRegister(true);
+                    setShowLogin(false);
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
+                >
+                  Register
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Search and Control Section */}
@@ -388,7 +437,15 @@ const ProductDashboard: React.FC = () => {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard 
+                  key={product.id} 
+                  product={product}
+                  onEdit={(product) => {
+                    setEditingProduct(product);
+                    setShowAddForm(false);
+                  }}
+                  onDelete={(product) => setDeletingProduct(product)}
+                />
               ))}
             </div>
 
@@ -489,10 +546,73 @@ const ProductDashboard: React.FC = () => {
       </div>
 
       {/* Product Form Modal */}
-      {showAddForm && (
+      {(showAddForm || editingProduct) && (
         <ProductForm
-          onClose={() => setShowAddForm(false)}
+          onClose={() => {
+            setShowAddForm(false);
+            setEditingProduct(null);
+          }}
           existingCategories={categories}
+          product={editingProduct}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Delete Product</h2>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete <strong>"{deletingProduct.title}"</strong>? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => setDeletingProduct(null)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await dispatch(removeProduct(deletingProduct.id)).unwrap();
+                      setDeletingProduct(null);
+                    } catch (error) {
+                      console.error('Failed to delete product:', error);
+                    }
+                  }}
+                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:bg-red-400 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLogin && (
+        <LoginForm
+          onClose={() => setShowLogin(false)}
+          onSwitchToRegister={() => {
+            setShowLogin(false);
+            setShowRegister(true);
+          }}
+        />
+      )}
+
+      {/* Register Modal */}
+      {showRegister && (
+        <RegisterForm
+          onClose={() => setShowRegister(false)}
+          onSwitchToLogin={() => {
+            setShowRegister(false);
+            setShowLogin(true);
+          }}
         />
       )}
     </div>
